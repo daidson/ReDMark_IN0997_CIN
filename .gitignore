@@ -3,5 +3,5 @@ include/*.pyc
 dev/
 .vscode/
 .venv
-
+.idea
 logs/*/Analysis/
