@@ -2,10 +2,11 @@ import tensorflow as tf
 from tensorflow.python.framework import tensor_shape
 from tensorflow.python.layers import utils, base
 from tensorflow.python.ops import array_ops, nn, init_ops, nn_ops
-from tensorflow.python.keras import activations
+from tensorflow.keras import activations
+from tensorflow.keras.layers import Layer
 
 
-class Conv2D_circular(tf.keras.layers.Layer):
+class Conv2D_circular(Layer):
   def __init__(self,
                filters,
                kernel_size,
@@ -45,7 +46,7 @@ class Conv2D_circular(tf.keras.layers.Layer):
     self.bias_regularizer = bias_regularizer
     self.kernel_constraint = kernel_constraint
     self.bias_constraint = bias_constraint
-    self.input_spec = base.InputSpec(ndim=self.rank + 2)
+    self.input_spec = tf.keras.layers.InputSpec(ndim=self.rank + 2)
 
   def build(self, input_shape):
     input_shape = tensor_shape.TensorShape(input_shape)
@@ -53,10 +54,10 @@ class Conv2D_circular(tf.keras.layers.Layer):
       channel_axis = 1
     else:
       channel_axis = -1
-    if input_shape[channel_axis].value is None:
+    if input_shape[channel_axis] is None:
       raise ValueError('The channel dimension of the inputs '
                        'should be defined. Found `None`.')
-    input_dim = input_shape[channel_axis].value
+    input_dim = input_shape[channel_axis]
     kernel_shape = self.kernel_size + (input_dim, self.filters)
 
     self.kernel = self.add_variable(name='kernel',
@@ -67,7 +68,7 @@ class Conv2D_circular(tf.keras.layers.Layer):
                                     trainable=True,
                                     dtype=self.dtype)
     if self.use_bias:
-      self.bias = self.add_variable(name='bias',
+      self.bias = self.add_variable(name='use_bias',
                                     shape=(self.filters,),
                                     initializer=self.bias_initializer,
                                     regularizer=self.bias_regularizer,
@@ -76,16 +77,15 @@ class Conv2D_circular(tf.keras.layers.Layer):
                                     dtype=self.dtype)
     else:
       self.bias = None
-    self.input_spec = base.InputSpec(ndim=self.rank + 2,
-                                     axes={channel_axis: input_dim})
+    self.input_spec = tf.keras.layers.InputSpec(ndim=self.rank + 2,
+                                                axes={channel_axis: input_dim})
     self._convolution_op = nn_ops.Convolution(
         input_shape,
         filter_shape=self.kernel.get_shape(),
         dilation_rate=self.dilation_rate,
         strides=self.strides,
         padding=self.padding.upper(),
-        data_format=utils.convert_data_format(self.data_format,
-                                              self.rank + 2))
+        data_format=utils.convert_data_format(self.data_format, self.rank + 2))
     self.built = True
 
   def call(self, inputs):

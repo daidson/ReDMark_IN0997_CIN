@@ -1,0 +1,9 @@
+EXP ID : new_model
+Block size : 8
+LR : 0.0001
+Epochs : 2, Steps : 2, Offset : 0
+Batch size : 32
+Relative loss : Iw=1.0 - W=1.0
+Gaussian Noise STD : 3.0
+Trainble Transform : False
+PSNR on last epoch : 75.60324792060895

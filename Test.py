@@ -53,7 +53,7 @@ def buildModel(model_path, patch_rows=32, patch_cols=32, channels=1, block_size=
     input_watermark = layers.Input(shape=(w_rows, w_cols, 1), name='input_watermark')
     
     # Rearrange input 
-    rearranged_img = l1 = layers.Lambda(tf.space_to_depth, arguments={'block_size':block_size}, name='rearrange_img')(input_img)
+    rearranged_img = l1 = layers.Lambda(tf.nn.space_to_depth, arguments={'block_size':block_size}, name='rearrange_img')(input_img)
     
     
     dct_layer = layers.Conv2D(64, (1, 1), activation='linear', padding='same', use_bias=False, trainable=False, name='dct1')
@@ -76,13 +76,13 @@ def buildModel(model_path, patch_rows=32, patch_cols=32, channels=1, block_size=
     encoder_model = layers.Lambda(multiply_scalar, arguments={'scalar':input_strenght_alpha}, name='strenght_factor')(encoder_model)
     
     encoder_model = layers.Add(name='residual_add')([encoder_model, l1])
-    encoder_model = x = layers.Lambda(tf.depth_to_space, arguments={'block_size':block_size}, name='enc_output_depth2space')(encoder_model)
+    encoder_model = x = layers.Lambda(tf.nn.depth_to_space, arguments={'block_size':block_size}, name='enc_output_depth2space')(encoder_model)
     
     # Attack (The attacks occure in test phase)
     
     # Watermark decoder
     input_attacked_img = layers.Input(shape=(patch_rows, patch_cols, 1), name='input_attacked_img')
-    decoder_model = layers.Lambda(tf.space_to_depth, arguments={'block_size':block_size}, name='dec_input_space2depth')(input_attacked_img)
+    decoder_model = layers.Lambda(tf.nn.space_to_depth, arguments={'block_size':block_size}, name='dec_input_space2depth')(input_attacked_img)
     decoder_model = dct_layer2(decoder_model)
     decoder_model = layers.Conv2D(64, (1, 1), dilation_rate=1, activation='elu', padding='same', name='dec_conv1')(decoder_model)
     decoder_model = conv2d_layer(64, (2, 2), dilation_rate=1, activation='elu', padding='same', name='dec_conv2')(decoder_model)
