@@ -16,6 +16,7 @@ import datetime
 from include.tensorboard_logging import Logger
 from include import loss_functions
 from include.my_circular_layer import Conv2D_circular
+from include.deformable_convolution import DeformableConvLayer
 from tensorflow import keras
 from tensorflow.keras import layers
 
@@ -98,10 +99,11 @@ q_mtx[q_mtx == 0] = 1
 img_rows, img_cols = 32, 32
 block_size = 8
 
-conv_type = 'circular'
+conv_type = 'deformable'
 conv_layers = {
     'standard': layers.Conv2D,
-    'circular': Conv2D_circular
+    'circular': Conv2D_circular,
+    'deformable': DeformableConvLayer
 }
 
 conv2d_layer = conv_layers[conv_type]
@@ -112,6 +114,9 @@ conv2d_layer_params = {
     'activation': 'elu',
     'padding': 'same'
 }
+batch_size = 32
+if conv_type == 'deformable':
+    conv2d_layer_params['batch_size'] = batch_size
 combine_cifar_pascal = True
 selected_dataset = 'cifar'  # cifar or pascal
 
@@ -275,10 +280,9 @@ if os.path.exists('./logs/{}'.format(exp_id)) == False:
 log_dir = './logs/{}'.format(exp_id)
 tf_logger = Logger(log_dir)
 
-batch_size = 32
-epochs = 2
+epochs = 100
 offset = 0  # for sometime with power outage
-steps = 2  # int(np.ceil(60000 / batch_size))
+steps = 10000  # int(np.ceil(60000 / batch_size))
 day_train = datetime.datetime.now()
 training_day = day_train.strftime("%d_%m_%Y")
 output_dir = "training_"+f"{training_day}"
