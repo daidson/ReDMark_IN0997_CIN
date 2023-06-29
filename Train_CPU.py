@@ -311,6 +311,21 @@ for e in range(epochs):
         loss_w.append(((model_output[1] - decoder_output) ** 2).mean())
 
         if step % 1000 == 0:
+            print('\tStep {}...'.format(step + 1))
+            Iw_encoder = model_output[0]
+            W_decoder = model_output[1][0, :, :, 0]
+            plt.subplot(221)
+            plt.imshow(I[0, :, :, 0], cmap='gray')
+            plt.title('Container[I]')
+            plt.subplot(222)
+            plt.imshow(W[0, :, :, 0], cmap='gray')
+            plt.title('Watermark[W]')
+            plt.subplot(223)
+            plt.imshow(Iw_encoder[0, :, :, 0], cmap='gray')
+            plt.title('Iw')
+            plt.subplot(224)
+            plt.imshow(W_decoder, cmap='gray')
+            plt.title('Extracted W')
             today = datetime.datetime.now()
             dt_for_file = today.strftime("%d_%m_%Y_%H_%M_%S")
             output_name = f"epoch_{e}_step_{step}_time_{dt_for_file}"
