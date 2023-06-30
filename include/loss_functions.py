@@ -10,8 +10,6 @@ from __future__ import absolute_import
 #from keras.objectives import *
 import tensorflow as tf
 import numpy as np
-keras = tf.keras
-K = keras.backend
 
 class SSIM_MSE_LOSS():
 	def __init__(self, ssim_relative_loss, mse_relative_loss, ssim_win_size=4):

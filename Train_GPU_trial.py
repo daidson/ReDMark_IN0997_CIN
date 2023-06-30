@@ -5,6 +5,7 @@
 *** JT-Net - Single Attack, JPEG(70), loss 3:1, cifar10+resampled_pascal, 100 epochs, lr=1e-4
 
 """
+
 # -*- coding: utf-8 -*-
 import tensorflow as tf
 import numpy as np
@@ -17,8 +18,11 @@ from include.tensorboard_logging import Logger
 from include import loss_functions
 from include.my_circular_layer import Conv2D_circular
 from include.deformable_convolution import DeformableConvLayer
+import numba as nb
+from numba import jit, jit_module
 from tensorflow import keras
 from tensorflow.keras import layers
+from numba_progress import ProgressBar
 
 
 def multiply_255(x):
@@ -45,9 +49,12 @@ def dropout_blocks(x):
 
 
 def salt_pepper_noise(x, salt_ratio):
+    # Thanks to https://tyfkda.github.io/blog/2016/09/22/tensorflow-salt-pepper.html
     random_image = tf.random.uniform(shape=[1, 4, 4, 64], minval=0.0, maxval=1, dtype=tf.float32, seed=None)
+
     salt_image = tf.cast(tf.greater_equal(random_image, 1.0 - salt_ratio), tf.float32) - 0.5
     pepper_image = tf.cast(tf.greater_equal(random_image, salt_ratio), tf.float32) - 0.5
+
     noised_image = tf.minimum(tf.maximum(x, salt_image), pepper_image)
     return noised_image
 
@@ -99,6 +106,9 @@ q_mtx[q_mtx == 0] = 1
 img_rows, img_cols = 32, 32
 block_size = 8
 
+# Set this parameter to True if the idea is to use a 2D convolution
+# If the objective is to use a Circular convolution, leave it as False
+
 conv_type = 'deformable'
 conv_layers = {
     'standard': layers.Conv2D,
@@ -117,25 +127,30 @@ conv2d_layer_params = {
 batch_size = 32
 if conv_type == 'deformable':
     conv2d_layer_params['batch_size'] = batch_size
+
 combine_cifar_pascal = True
-selected_dataset = 'cifar'  # cifar or pascal
+selected_dataset = 'pascal'  # cifar or pascal
 
 # the data, split between train and test sets
 print('Loading dataset...')
-(x_train_cifar, y_train_cifar), (x_test_cifar, y_test_cifar) = keras.datasets.cifar10.load_data()
-x_train_cifar = x_train_cifar.reshape(x_train_cifar.shape[0], img_rows, img_cols, 3)
-x_train_cifar = x_train_cifar[:, :, :, 1]
-x_train_cifar = x_train_cifar.reshape(x_train_cifar.shape[0], img_rows, img_cols, 1)
-x_test_cifar = x_test_cifar.reshape(x_test_cifar.shape[0], img_rows, img_cols, 3)
-x_test_cifar = x_test_cifar[:, :, :, 1]
-x_test_cifar = x_test_cifar.reshape(x_test_cifar.shape[0], img_rows, img_cols, 1)
+if selected_dataset == 'cifar' or combine_cifar_pascal:
+    (x_train_cifar, y_train_cifar), (x_test_cifar, y_test_cifar) = keras.datasets.cifar10.load_data()
+    x_train_cifar = x_train_cifar.reshape(x_train_cifar.shape[0], img_rows, img_cols, 3)
+    x_train_cifar = x_train_cifar[:, :, :, 1]
+    x_train_cifar = x_train_cifar.reshape(x_train_cifar.shape[0], img_rows, img_cols, 1)
+    x_test_cifar = x_test_cifar.reshape(x_test_cifar.shape[0], img_rows, img_cols, 3)
+    x_test_cifar = x_test_cifar[:, :, :, 1]
+    x_test_cifar = x_test_cifar.reshape(x_test_cifar.shape[0], img_rows, img_cols, 1)
 
 x_train_pascal = sio.loadmat('./images/pascal/pascal_resampled.mat')['patches']
 x_train_pascal = x_train_pascal[..., np.newaxis]
 
 # Combine 
 if combine_cifar_pascal == False:
-    x_train = x_train_cifar if selected_dataset == 'cifar' else x_train_pascal
+    if selected_dataset == 'cifar':
+        x_train = x_train_cifar
+    else:
+        x_train = x_train_pascal
 else:
     x_train = np.concatenate([x_train_cifar, x_train_pascal], axis=0)
 
@@ -234,12 +249,10 @@ decoder_model = dct_layer(rounding_noise)
 decoder_model = layers.Conv2D(num_of_filters, (1, 1), dilation_rate=1, activation='elu', padding='same',
                               name='dec_conv1')(decoder_model)
 decoder_model = conv2d_layer(name='dec_conv2', **conv2d_layer_params)(decoder_model)
-if conv_type != 'graph':
-    decoder_model = conv2d_layer(name='dec_conv3', **conv2d_layer_params)(decoder_model)
-    decoder_model = conv2d_layer(name='dec_conv4', **conv2d_layer_params)(decoder_model)
+decoder_model = conv2d_layer(name='dec_conv3', **conv2d_layer_params)(decoder_model)
+decoder_model = conv2d_layer(name='dec_conv4', **conv2d_layer_params)(decoder_model)
 decoder_model = layers.Conv2D(1, (1, 1), dilation_rate=1, activation='sigmoid', padding='same',
                               name='dec_output_depth2space')(decoder_model)
-
 # Whole model
 model = keras.models.Model(inputs=[input_img, input_watermark], outputs=[x, decoder_model])
 model.summary()
@@ -280,79 +293,134 @@ if os.path.exists('./logs/{}'.format(exp_id)) == False:
 log_dir = './logs/{}'.format(exp_id)
 tf_logger = Logger(log_dir)
 
-epochs = 100
+batch_size = 32
+epochs = 1
 offset = 0  # for sometime with power outage
-steps = 10000  # int(np.ceil(60000 / batch_size))
+steps = 2 # int(np.ceil(60000 / batch_size))
+
 day_train = datetime.datetime.now()
 training_day = day_train.strftime("%d_%m_%Y")
-output_dir = "training_"+f"{training_day}"
+output_dir = "training_" + f"{training_day}"
 
 if not os.path.exists(output_dir):
     os.mkdir(output_dir)
 
-for e in range(epochs):
-    loss_w = []
-    loss_I = []
-    for step in tqdm(range(steps)):
-        img_idx = np.random.randint(0, x_train.shape[0], batch_size)
-        water_idx = np.random.randint(0, x_train.shape[0], batch_size)
 
-        I = x_train[img_idx, :, :, :]
-
-        W = np.random.randint(low=0, high=2, size=(batch_size, w_rows, w_cols, 1)).astype(np.float32)
-
-        encoder_output = I
-        decoder_output = W
-
+@jit(target_backend='gpu', nopython=False)
+def train_step(I, W, encoder_output, decoder_output, loss_I, loss_w):
+    with tf.device("GPU:0"):
         model.train_on_batch(x=[I, W], y=[encoder_output, decoder_output])
         model_output = model.predict_on_batch([I, W])
-
         loss_I.append(((model_output[0] - encoder_output) ** 2).mean())
         loss_w.append(((model_output[1] - decoder_output) ** 2).mean())
+    return model_output, loss_I, loss_w
 
-        if step % 1000 == 0:
-            print('\tStep {}...'.format(step + 1))
-            Iw_encoder = model_output[0]
-            W_decoder = model_output[1][0, :, :, 0]
-            plt.subplot(221)
-            plt.imshow(I[0, :, :, 0], cmap='gray')
-            plt.title('Container[I]')
-            plt.subplot(222)
-            plt.imshow(W[0, :, :, 0], cmap='gray')
-            plt.title('Watermark[W]')
-            plt.subplot(223)
-            plt.imshow(Iw_encoder[0, :, :, 0], cmap='gray')
-            plt.title('Iw')
-            plt.subplot(224)
-            plt.imshow(W_decoder, cmap='gray')
-            plt.title('Extracted W')
-            today = datetime.datetime.now()
-            dt_for_file = today.strftime("%d_%m_%Y_%H_%M_%S")
-            output_name = f"epoch_{e}_step_{step}_time_{dt_for_file}"
-            plt.savefig(f"{output_dir}/{output_name}")
 
-    mean_error_w = np.mean(loss_w)
-    mean_error_I = np.mean(loss_I)
-    psnr = 10 * np.log10(1 ** 2 / mean_error_I)
-    print('\tI Error = {} And W Error = {}'.format(mean_error_I, mean_error_w))
-    print('PSNR is: ', psnr)
+@jit(nopython=False)
+def log(mean_error_w, mean_error_I, psnr, e):
     tf_logger.log_scalar('W_MSE', mean_error_w, e + 1)
     tf_logger.log_scalar('I_MSE', mean_error_I, e + 1)
     tf_logger.log_scalar('PSNR', psnr, e + 1)
 
-    if (e + 1) % 10 == 0:
-        model.save_weights('./logs/{}/Weights/weights_{}.h5'.format(exp_id, e + 1 + offset))
 
-model.save_weights('./logs/{}/Weights/weights_final.h5'.format(exp_id))
+@jit(target_backend='gpu', nopython=False, forceobj=True)
+def save_weights(path: str):
+    model.save_weights(path)
 
-# Save info
-with open('./logs/{}/exp_info.txt'.format(exp_id), 'w') as f:
-    f.write('EXP ID : {}\n'.format(exp_id))
-    f.write('Block size : {}\n'.format(block_size))
-    f.write('LR : {}\n'.format(lr))
-    f.write('Epochs : {}, Steps : {}, Offset : {}\n'.format(epochs, steps, offset))
-    f.write('Batch size : {}\n'.format(batch_size))
-    f.write('Relative loss : Iw={} - W={}\n'.format(enc_output_weight, dec_output_weight))
-    f.write('Gaussian Noise STD : {}\n'.format(noise_std))
-    f.write('Trainble Transform : {}\n'.format(trainable_transform))
-    f.write('PSNR on last epoch : {}\n'.format(psnr))
+
+@jit(nopython=False)
+def save_images(I, W, model_output):
+    Iw_encoder = model_output[0]
+    W_decoder = model_output[1][0, :, :, 0]
+
+    plt.subplot(221)
+    plt.imshow(I[0, :, :, 0], cmap='gray')
+    plt.title('Container[I]')
+
+    plt.subplot(222)
+    plt.imshow(W[0, :, :, 0], cmap='gray')
+    plt.title('Watermark[W]')
+
+    plt.subplot(223)
+    plt.imshow(Iw_encoder[0, :, :, 0], cmap='gray')
+    plt.title('Iw')
+
+    plt.subplot(224)
+    plt.imshow(W_decoder, cmap='gray')
+    plt.title('Extracted W')
+
+    today = datetime.datetime.now()
+    dt_for_file = today.strftime("%d_%m_%Y_%H_%M_%S")
+
+    output_name = f"epoch_{e}_step_{step}_time_{dt_for_file}"
+
+    plt.savefig(f"{output_dir}/{output_name}")
+
+
+@jit(nopython=False)
+def save_info(
+        exp_id, block_size, lr, epochs, steps, offset, batch_size, enc_output_weight, dec_output_weight,
+        noise_std, trainable_transform, psnr
+):
+    with open('./logs/{}/exp_info.txt'.format(exp_id), 'w') as f:
+        f.write('EXP ID : {}\n'.format(exp_id))
+        f.write('Block size : {}\n'.format(block_size))
+        f.write('LR : {}\n'.format(lr))
+        f.write('Epochs : {}, Steps : {}, Offset : {}\n'.format(epochs, steps, offset))
+        f.write('Batch size : {}\n'.format(batch_size))
+        f.write('Relative loss : Iw={} - W={}\n'.format(enc_output_weight, dec_output_weight))
+        f.write('Gaussian Noise STD : {}\n'.format(noise_std))
+        f.write('Trainble Transform : {}\n'.format(trainable_transform))
+        f.write('PSNR on last epoch : {}\n'.format(psnr))
+
+
+@jit(target_backend='gpu', nopython=True)
+def train(p_bar):
+    for e in range(epochs):
+        print(f'Epochs {e+1}...')
+        loss_w = []
+        loss_I = []
+        for step in range(steps):
+            img_idx = np.random.randint(0, x_train.shape[0], batch_size)
+            water_idx = np.random.randint(0, x_train.shape[0], batch_size)
+
+            I = x_train[img_idx, :, :, :]
+
+            W = np.random.randint(low=0, high=2, size=(batch_size, w_rows, w_cols, 1)).astype(np.float32)
+
+            encoder_output = I
+            decoder_output = W
+
+            model_output, loss_I, loss_w = train_step(I, W, encoder_output, decoder_output, loss_I, loss_w)
+
+            if step % 1000 == 0:
+                print(f'\tStep {step+1}...')
+                save_images(I, W, model_output)
+            p_bar.update(1)
+        # reset the progress bar
+        p_bar.update(-steps)
+
+        mean_error_w = np.mean(loss_w)
+        mean_error_I = np.mean(loss_I)
+        psnr = 10 * np.log10(1 ** 2 / mean_error_I)
+        print(f'\tI Error = {mean_error_I} And W Error = {mean_error_w}')
+        print('PSNR is: ', psnr)
+        log(mean_error_w, mean_error_I, psnr, e)
+
+        if (e + 1) % 10 == 0:
+            save_weights(path=f'./logs/{exp_id}/Weights/weights_{e + 1 + offset}.h5')
+
+    save_weights(path=f'./logs/{exp_id}/Weights/weights_final.h5')
+
+    # Save info
+    save_info(
+        exp_id, block_size, lr, epochs, steps, offset, batch_size, enc_output_weight, dec_output_weight,
+        noise_std, trainable_transform, psnr
+    )
+
+    print("Training complete!")
+
+
+if __name__ == '__main__':
+    with ProgressBar(total=steps) as p_bar:
+        train(p_bar)
