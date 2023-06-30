@@ -18,7 +18,7 @@ class SSIM_MSE_LOSS():
 		self.win_size = ssim_win_size
 		
 	def ssimmse_loss(self, y_true, y_pred):
-		return 1.0 - (self.ssim_relative_loss)*(self.tf_ssim(y_true, y_pred, size=self.win_size)) + (self.mse_relative_loss)*(tf.losses.mean_squared_error(y_true, y_pred))
+		return 1.0 - (self.ssim_relative_loss)*(self.tf_ssim(y_true, y_pred, size=self.win_size)) + (self.mse_relative_loss)*(tf.compat.v1.losses.mean_squared_error(y_true, y_pred))
 
 
 	def tf_ssim(self, img1, img2, cs_map=False, mean_metric=True, size=11, sigma=1.5):

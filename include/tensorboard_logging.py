@@ -8,13 +8,15 @@ import tensorflow as tf
 from io import StringIO
 import matplotlib.pyplot as plt
 import numpy as np
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
 class Logger(object):
     """Logging in tensorboard without tensorflow ops."""
 
     def __init__(self, log_dir):
         """Creates a summary writer logging to log_dir."""
-        self.writer = tf.summary.create_file_writer(log_dir)
+        self.writer =  tf.compat.v1.summary.FileWriter(log_dir)
 
     def log_scalar(self, tag, value, step):
         with self.writer.as_default():
