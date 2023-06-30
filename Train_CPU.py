@@ -99,7 +99,7 @@ q_mtx[q_mtx == 0] = 1
 img_rows, img_cols = 32, 32
 block_size = 8
 
-conv_type = 'deformable'
+conv_type = 'circular'
 conv_layers = {
     'standard': layers.Conv2D,
     'circular': Conv2D_circular,
@@ -254,7 +254,7 @@ idct_mtx = np.reshape(idct_mtx, [1, 1, num_of_filters, num_of_filters])
 model.get_layer('idct').set_weights(np.array([idct_mtx]))
 
 mean_attack = 1 / 9.0 * np.ones((3, 3, 1, 1))  ################## <LOAD WEIGHTS> ##########################
-# model.get_layer('smoothing_attak').set_weights([mean_attack])
+# model.get_layer('smoothing_attack').set_weights([mean_attack])
 # keras.utils.plot_model(model, to_file='model_general_dct.png')
 
 # Define loss
