@@ -5,3 +5,4 @@ dev/
 .venv
 
 logs/*/Analysis/
+images/
