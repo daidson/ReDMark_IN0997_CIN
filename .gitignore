@@ -5,4 +5,5 @@ dev/
 .venv
 .idea
 logs/*/Analysis/
-images/
+images
+training_29_06_2023
