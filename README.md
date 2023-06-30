@@ -3,13 +3,13 @@ ReDMark
 
 ## What is ReDMark
 
-![Im1](images/MD/overal.png "overal")
+![Im1](markdown/overal.png "overal")
 
 ReDMark is a watermarking framework that uses Convolutional Neural Networks (CNNs) in watermark embedding and extraction. Both embedding and extraction networks are trained together in an end-to-end pipeline; Therefore, the trained embedding and extraction networks interact better in the real situations. 
 
 Also, we simulate some attacks so that the networks embed the data more robustly. We implemented multiple different attacks as network layers. The most interesting attack is Jpeg attack that is written fully by network structures. Another useful attack that helped our networks to propagate the watermark data more, is grid-crop attack. The networks can be trained by multiple attacks at the same time and the results would be robust against all of them. 
 
-![Im2](images/MD/multi-attack.png "multi-attack")
+![Im2](markdown/multi-attack.png "multi-attack")
 
 ## The circular convolutional layer
 
@@ -22,7 +22,7 @@ To share the watermark data between more image regions, we developed the novel c
     3- Some attacks are not differentiable and cannot be implemented exactly as they are. In this cases we used their approximations. The experiments showed us that the resulting networks are robust to not only the real attack but also to a wider family of attacks.
     4- The embedding network's structure is residual. This means that the watermark data is embedded into the residual part of the pipeline and then added to the original image. This helps the transparency of the watermarked images. 
 
-![Im3](images/MD/Embedding.png "Embedding")
+![Im3](markdown/Embedding.png "Embedding")
 
 ## How to use
 
