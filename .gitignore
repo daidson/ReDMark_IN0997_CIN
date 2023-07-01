@@ -1,0 +1,15 @@
+*.pyc
+include/*.pyc
+dev/
+.vscode/
+.venv
+.venv38
+.idea
+logs/*/Analysis/
+images
+training_29_06_2023
+training_30_06_2023
+.ipynb_checkpoints
+*.ipynb
+pyenv.cfg
+.python-version
