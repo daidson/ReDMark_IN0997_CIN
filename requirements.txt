@@ -1,7 +1,0 @@
-tensorflow
-opencv-python
-scikit-learn
-matplotlib
-scikit-image
-tqdm
-h5py
