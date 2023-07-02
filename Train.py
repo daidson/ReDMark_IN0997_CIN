@@ -276,7 +276,7 @@ model.compile(loss={'enc_output_depth2space': ssimmse_loss, 'dec_output_depth2sp
 
 
 # %% Training
-exp_id = f"{conv_type}"+"_model"
+exp_id = f"{conv_type}"+"_simple_model"
 
 if os.path.exists('./logs/{}'.format(exp_id)) == False:
     os.mkdir('./logs/{}'.format(exp_id))
@@ -290,7 +290,7 @@ offset = 0  # for sometime with power outage
 steps = 10000  # int(np.ceil(60000 / batch_size))
 day_train = datetime.datetime.now()
 training_day = day_train.strftime("%d_%m_%Y")
-output_dir = f"{conv_type}"+"_training_"+f"{training_day}"
+output_dir = f"{conv_type}"+"_simple_training_"+f"{training_day}"
 
 if not os.path.exists(output_dir):
     os.mkdir(output_dir)
