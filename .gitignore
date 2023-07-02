@@ -13,3 +13,5 @@ training_30_06_2023
 *.ipynb
 pyenv.cfg
 .python-version
+trained/
+deformable_training_02_07_2023

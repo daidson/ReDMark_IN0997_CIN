@@ -81,7 +81,7 @@ def UniformNoise(x, val):
 
 
 Q = 70
-jpeg_noise = 0.55
+jpeg_noise = 0.70
 q_mtx = sio.loadmat('./transforms/jpeg_qm.mat')['qm']
 q_mtx = q_mtx.astype('float32')
 if (Q < 50):
@@ -95,11 +95,12 @@ q_mtx = np.repeat(q_mtx[np.newaxis, ...], 4, axis=0)
 q_mtx = np.squeeze(q_mtx)
 q_mtx[q_mtx == 0] = 1
 
+
 # input image dimensions
 img_rows, img_cols = 32, 32
 block_size = 8
 
-conv_type = 'circular'
+conv_type = 'deformable'
 conv_layers = {
     'standard': layers.Conv2D,
     'circular': Conv2D_circular,
@@ -270,8 +271,9 @@ model.compile(loss={'enc_output_depth2space': ssimmse_loss, 'dec_output_depth2sp
               loss_weights={'enc_output_depth2space': enc_output_weight, 'dec_output_depth2space': dec_output_weight},
               optimizer=keras.optimizers.SGD(lr=lr, momentum=0.98))
 
+
 # %% Training
-exp_id = 'new_model'
+exp_id = f"{conv_type}"+"_model"
 
 if os.path.exists('./logs/{}'.format(exp_id)) == False:
     os.mkdir('./logs/{}'.format(exp_id))
@@ -280,12 +282,12 @@ if os.path.exists('./logs/{}'.format(exp_id)) == False:
 log_dir = './logs/{}'.format(exp_id)
 tf_logger = Logger(log_dir)
 
-epochs = 100
+epochs = 10
 offset = 0  # for sometime with power outage
 steps = 10000  # int(np.ceil(60000 / batch_size))
 day_train = datetime.datetime.now()
 training_day = day_train.strftime("%d_%m_%Y")
-output_dir = "training_"+f"{training_day}"
+output_dir = f"{conv_type}"+"_training_"+f"{training_day}"
 
 if not os.path.exists(output_dir):
     os.mkdir(output_dir)
@@ -356,3 +358,4 @@ with open('./logs/{}/exp_info.txt'.format(exp_id), 'w') as f:
     f.write('Gaussian Noise STD : {}\n'.format(noise_std))
     f.write('Trainble Transform : {}\n'.format(trainable_transform))
     f.write('PSNR on last epoch : {}\n'.format(psnr))
+    f.write("Strength factor : {}\n".format(S))
