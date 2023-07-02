@@ -100,7 +100,8 @@ q_mtx[q_mtx == 0] = 1
 img_rows, img_cols = 32, 32
 block_size = 8
 
-conv_type = 'deformable'
+conv_type = 'circular'
+deformable_before_decoding = True
 conv_layers = {
     'standard': layers.Conv2D,
     'circular': Conv2D_circular,
@@ -232,6 +233,8 @@ rounding_noise = layers.GaussianNoise(stddev=0.003, name='rounding_noise')(attac
 
 # Watermark decoder
 decoder_model = dct_layer(rounding_noise)
+if deformable_before_decoding:
+    decoder_model = DeformableConvLayer(name='dec_conv0', batch_size=batch_size, **conv2d_layer_params)(decoder_model)
 decoder_model = layers.Conv2D(num_of_filters, (1, 1), dilation_rate=1, activation='elu', padding='same',
                               name='dec_conv1')(decoder_model)
 decoder_model = conv2d_layer(name='dec_conv2', **conv2d_layer_params)(decoder_model)
