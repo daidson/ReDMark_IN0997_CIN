@@ -17,7 +17,7 @@ from matplotlib import cm
 import scipy.io as sio
 import cv2
 import skimage.transform as imgTrans
-from skimage.measure import compare_ssim, compare_psnr
+from skimage.metrics import structural_similarity, peak_signal_noise_ratio
 import PIL
 from PIL import Image
 from PIL import ImageFont
@@ -380,10 +380,10 @@ for test_img in test_imgs_files:
             Iw = np.uint8(Iw.squeeze())
             # PSNR
             #psnr = 10*np.log10(255**2/np.mean((im_gray - Iw)**2))
-            psnr = compare_psnr(im_gray, Iw, data_range=255)
+            psnr = peak_signal_noise_ratio(im_gray, Iw, data_range=255)
             tmp_psnr.append(psnr)
             # SSIM
-            tmp_ssim.append(compare_ssim(im_gray, Iw, win_size=9, data_range=255))
+            tmp_ssim.append(structural_similarity(im_gray, Iw, win_size=9, data_range=255))
             
             # Save sample image
             if n == 0 and save_samples == True:
